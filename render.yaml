@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: devhelper-ai
+    env: docker
+    plan: free
+    repo: https://github.com/XessX/devhelper-ai
+    branch: main
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DOCKERIZED
+        value: true
