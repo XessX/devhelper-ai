@@ -46,7 +46,6 @@ Set your Render env variable:
 env
 OPENAI_API_KEY=your-key-here
 
-## 📸 Screenshot
 
 ## 📸 Screenshot
 
