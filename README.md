@@ -48,7 +48,9 @@ OPENAI_API_KEY=your-key-here
 
 ## 📸 Screenshot
 
-[![Devhelper-AI](https://i.postimg.cc/m2XYFGns/Screenshot-2025-04-18-080345.png)](https://postimg.cc/8jvJqxDK)
+## 📸 Screenshot
+
+![DevHelper AI Screenshot](assets/Screenshot-2025-04-18-080345.png)
 
 
 💡 Use Cases
