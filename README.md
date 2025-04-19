@@ -50,7 +50,6 @@ OPENAI_API_KEY=your-key-here
 ## 📸 Screenshot
 
 ![DevHelper AI Screenshot](assets/Screenshot-2025-04-18-080345.png)
-[![DevHelper AI Screenshot](https://i.postimg.cc/QMJ0xcTX/Screenshot-2025-04-18-080345.png)](https://postimg.cc/3yWgt416)
 
 💡 Use Cases
 Chat with unfamiliar repositories
