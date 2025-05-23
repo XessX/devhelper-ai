@@ -29,3 +29,5 @@ chroma_store/
 # OS junk
 .DS_Store
 Thumbs.db
+
+run-devhelper.ps1

@@ -7,3 +7,4 @@ chroma_store/
 cloned_repo/
 node_modules/
 .env
+run-devhelper.ps1
