@@ -1,16 +1,18 @@
-# Everything from requirements.txt
 streamlit
 langchain
 langchain-core
 langchain-community
 langchain-text-splitters
+langchain-ollama>=0.3.0
 chromadb
 beautifulsoup4
 requests
 python-dotenv
 langchain-openai
 langchain-chroma
-openai
 
-# Local Ollama LLM
-langchain-ollama>=0.3.0
+# Ollama for local
+langchain-ollama>=0.1.0
+
+# OpenAI for Render
+openai
