@@ -1,3 +1,4 @@
+# Everything from requirements.txt
 streamlit
 langchain
 langchain-core
@@ -10,3 +11,6 @@ python-dotenv
 langchain-openai
 langchain-chroma
 openai
+
+# Local Ollama LLM
+langchain-ollama>=0.3.0
