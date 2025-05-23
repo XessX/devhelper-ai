@@ -23,16 +23,18 @@ def load_llm(engine: str = None):
     if is_render():
         engine = "openai"
 
-    # Only allow Ollama locally, if USE_OLLAMA=1 is set in .env.
+    # Default selection if not specified: use .env locally, otherwise OpenAI
     if engine is None:
         use_env = os.getenv("USE_OLLAMA", "0") == "1"
         engine = "ollama" if use_env else "openai"
 
-    # 🚨 Double-check Ollama is NOT used in Render/cloud!
-    if is_render() and (engine == "ollama"):
-        raise RuntimeError("Ollama is not supported in online mode. Please select OpenAI.")
+    # 🚨 Double-check: absolutely never allow Ollama in Render/cloud
+    if is_render() and engine == "ollama":
+        raise RuntimeError("Ollama is not supported in online/cloud mode. Please select OpenAI.")
 
+    # --- Import ONLY what you need ---
     if engine == "ollama":
+        # Only import Ollama client locally, never in cloud
         from langchain_ollama import OllamaLLM
         return OllamaLLM(model="llama3")
     else:

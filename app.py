@@ -176,9 +176,11 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 st.success("✅ New vector store created")
 
             # --- SAFETY: Always use OpenAI on Render/cloud ---
+            engine_to_use = "openai" if render_mode else llm_engine
+
             qa_chain = get_llm_chain(
                 vectordb,
-                engine="openai" if render_mode else llm_engine
+                engine=engine_to_use
             )
 
         if st.checkbox("📜 Preview Chunked Content", key="preview_checkbox"):
