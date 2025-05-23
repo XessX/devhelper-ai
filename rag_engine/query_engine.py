@@ -7,20 +7,28 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 def is_render():
-    return os.getenv("RENDER", "false").lower() == "true" or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+    """
+    Detect if running in Render (cloud) environment.
+    """
+    return (
+        os.getenv("RENDER", "false").lower() == "true"
+        or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+    )
 
 def load_llm(engine: str = None):
-    # 🚨 Absolutely prevent Ollama in Render/online mode!
+    """
+    Load the appropriate LLM engine (OpenAI or Ollama), bulletproof against cloud/Ollama conflicts.
+    """
+    # 🚨 Force OpenAI in Render/cloud mode (never allow Ollama).
     if is_render():
         engine = "openai"
 
-    # (Never allow Ollama, even if .env says so, if on Render!)
+    # Only allow Ollama locally, if USE_OLLAMA=1 is set in .env.
     if engine is None:
-        # Respect env only if NOT in Render
         use_env = os.getenv("USE_OLLAMA", "0") == "1"
         engine = "ollama" if use_env else "openai"
 
-    # 🚨 Double-check again!
+    # 🚨 Double-check Ollama is NOT used in Render/cloud!
     if is_render() and (engine == "ollama"):
         raise RuntimeError("Ollama is not supported in online mode. Please select OpenAI.")
 
@@ -36,6 +44,9 @@ def load_llm(engine: str = None):
         )
 
 def get_llm_chain(vectordb, engine: str = None):
+    """
+    Returns a chain that handles retrieval-augmented QA and project summary, using the right LLM.
+    """
     llm = load_llm(engine)
     retriever = vectordb.as_retriever()
 
@@ -48,6 +59,7 @@ def get_llm_chain(vectordb, engine: str = None):
             if not query:
                 return "❌ No question provided."
 
+            # Triggers for project summary
             summary_triggers = [
                 "readme", "project", "repo", "what this repo", "what is this repo",
                 "what this codebase", "what does this repo do", "describe this repository",
@@ -82,6 +94,7 @@ Based on the above files and their content, give a clear, practical summary of w
                     question=query.strip()
                 ).to_string()
                 return llm.invoke(prompt_text)
+            # Default: use vanilla QA
             return self.qa_chain.invoke({"query": query})
 
     return SmartChain()

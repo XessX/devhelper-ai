@@ -44,9 +44,8 @@ def make_db_name(source, chunk_size, chunk_overlap):
 docker_mode = is_docker()
 render_mode = is_render()
 
-# --- State Initialization ---
+# --- Remove Ollama/LLM state in cloud (session safety) ---
 if render_mode:
-    # Remove any Ollama-related state for safety
     for k in list(st.session_state.keys()):
         if "ollama" in k.lower() or "llm" in k.lower():
             del st.session_state[k]
@@ -176,7 +175,7 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            # Always, always force OpenAI in Render/cloud!
+            # --- SAFETY: Always use OpenAI on Render/cloud ---
             qa_chain = get_llm_chain(
                 vectordb,
                 engine="openai" if render_mode else llm_engine
@@ -213,4 +212,3 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
         st.error(f"❌ Error: {e}")
 else:
     st.info("👈 Please enter a valid folder, GitHub repo, or website.")
-
