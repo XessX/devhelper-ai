@@ -1,33 +1,30 @@
 import os
 from dotenv import load_dotenv
 
-# -------------------------------------------------------------------
-# NOTE: This file is Render- and Docker-safe!
-# It does NOT call Docker or require any special system binaries.
-# -------------------------------------------------------------------
-
 load_dotenv()
 
 from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 
 def is_render():
-    # Detect Render deployment
     return os.getenv("RENDER", "false").lower() == "true" or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
 
 def load_llm(engine: str = None):
-    # Force OpenAI in Render/online mode no matter what
+    # 🚨 Absolutely prevent Ollama in Render/online mode!
     if is_render():
         engine = "openai"
 
-    use_env = os.getenv("USE_OLLAMA", "0") == "1"
-    use_ollama = engine == "ollama" or (engine is None and use_env)
+    # (Never allow Ollama, even if .env says so, if on Render!)
+    if engine is None:
+        # Respect env only if NOT in Render
+        use_env = os.getenv("USE_OLLAMA", "0") == "1"
+        engine = "ollama" if use_env else "openai"
 
-    # Extra: raise a warning if somehow Ollama is still attempted in Render
-    if is_render() and (engine == "ollama" or use_ollama):
+    # 🚨 Double-check again!
+    if is_render() and (engine == "ollama"):
         raise RuntimeError("Ollama is not supported in online mode. Please select OpenAI.")
 
-    if use_ollama:
+    if engine == "ollama":
         from langchain_ollama import OllamaLLM
         return OllamaLLM(model="llama3")
     else:
@@ -39,8 +36,8 @@ def load_llm(engine: str = None):
         )
 
 def get_llm_chain(vectordb, engine: str = None):
-    retriever = vectordb.as_retriever()
     llm = load_llm(engine)
+    retriever = vectordb.as_retriever()
 
     class SmartChain:
         def __init__(self):

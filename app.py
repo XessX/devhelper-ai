@@ -1,13 +1,12 @@
 import os
 import json
+import shutil
+import hashlib
 from pathlib import Path
 from dotenv import load_dotenv
 import streamlit as st
-import hashlib
-import shutil
 
 from langchain_core.documents import Document
-
 from rag_engine.loader import load_codebase
 from rag_engine.chunker import chunk_repo_texts, suggest_chunk_config, preview_chunks
 from rag_engine.vector_store import store_in_chroma, load_chroma
@@ -21,7 +20,10 @@ def is_docker():
     return os.path.exists("/.dockerenv") or os.getenv("DOCKERIZED", "false").lower() == "true"
 
 def is_render():
-    return os.getenv("RENDER", "false").lower() == "true" or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+    return (
+        os.getenv("RENDER", "false").lower() == "true"
+        or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+    )
 
 def extract_answer(response):
     if isinstance(response, str):
@@ -42,23 +44,27 @@ def make_db_name(source, chunk_size, chunk_overlap):
 docker_mode = is_docker()
 render_mode = is_render()
 
-# 🚨 Clean up ALL ollama/llm-related keys from session state in Render/cloud mode!
+# --- State Initialization ---
 if render_mode:
+    # Remove any Ollama-related state for safety
     for k in list(st.session_state.keys()):
         if "ollama" in k.lower() or "llm" in k.lower():
             del st.session_state[k]
 
 if "history" not in st.session_state:
     st.session_state.history = []
-
 if "last_github_url" not in st.session_state:
     st.session_state.last_github_url = None
 
 st.set_page_config(page_title="DevHelper AI 🤖", layout="wide")
 st.title("🧠 DevHelper AI - Chat with Your Codebase")
 
-# ───────────────────────────────────────────────
-source_option = st.radio("📦 Load project from:", ["📁 Local Folder", "🌐 GitHub Repo", "🔗 Website"], key="source_option")
+# ─────────── SOURCE SELECTION ───────────
+source_option = st.radio(
+    "📦 Load project from:", 
+    ["📁 Local Folder", "🌐 GitHub Repo", "🔗 Website"], 
+    key="source_option"
+)
 path_input, docs = "", []
 
 if source_option == "📁 Local Folder":
@@ -81,7 +87,6 @@ elif source_option == "🌐 GitHub Repo":
     force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_checkbox")
     repo_changed = github_url != st.session_state.last_github_url
     should_reclone = force_reindex or not os.path.exists("cloned_repo") or repo_changed
-
     if github_url:
         if should_reclone:
             if os.path.exists("cloned_repo"):
@@ -105,15 +110,25 @@ elif source_option == "🔗 Website":
             docs = [doc]
             path_input = "web_loaded"
 
-exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__", key="exclude_dirs_textarea").split(",")
+exclude_dirs = st.text_area(
+    "🚫 Folders to exclude (comma-separated)", 
+    ".venv, node_modules, __pycache__", 
+    key="exclude_dirs_textarea"
+).split(",")
 
-# Always force OpenAI in Render mode; local can choose
+# --- LLM Engine Selection ---
 if render_mode:
     llm_engine = "openai"
     st.info("🌐 Running in online mode: Only OpenAI is available.")
 else:
-    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0, key="llm_radio").lower()
+    llm_engine = st.radio(
+        "🧠 Choose LLM Engine", 
+        ["OpenAI", "Ollama"], 
+        index=0, 
+        key="llm_radio"
+    ).lower()
 
+# --- Chunking Config ---
 st.subheader("🔧 Chunking Configuration")
 smart_mode = st.checkbox("🧠 Auto-Tune Chunk Size", value=True, key="autotune_checkbox")
 chunk_size, chunk_overlap = 800, 100
@@ -126,6 +141,7 @@ else:
     chunk_size = st.slider("🧩 Chunk Size", 100, 2000, chunk_size, 100, key="chunk_slider")
     chunk_overlap = st.slider("🔁 Chunk Overlap", 0, 500, chunk_overlap, 50, key="overlap_slider")
 
+# --- MAIN LOGIC ---
 if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
     try:
         if source_option == "🌐 GitHub Repo":
@@ -160,7 +176,7 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            # Always, always force openai for Render/cloud!
+            # Always, always force OpenAI in Render/cloud!
             qa_chain = get_llm_chain(
                 vectordb,
                 engine="openai" if render_mode else llm_engine
@@ -186,9 +202,15 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
 
         if st.session_state.history:
             hist_json = json.dumps(st.session_state.history, indent=2)
-            st.download_button("💾 Download Chat Log", hist_json, file_name="devhelper_chat.json", key="dl_button")
+            st.download_button(
+                "💾 Download Chat Log", 
+                hist_json, 
+                file_name="devhelper_chat.json", 
+                key="dl_button"
+            )
 
     except Exception as e:
         st.error(f"❌ Error: {e}")
 else:
     st.info("👈 Please enter a valid folder, GitHub repo, or website.")
+
