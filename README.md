@@ -1,7 +1,7 @@
 # 🧠 DevHelper AI
 
 **Chat with your codebase using LLMs!**  
-Analyze local projects, GitHub repos, or entire websites with **OpenAI** (online) or **Ollama** (local, optional).
+Analyze local projects, GitHub repos, or entire websites with **OpenAI** (online/cloud) or **Ollama** (local/dev, optional).
 
 🌐 **Live Demo:** [https://devhelper-ai.onrender.com](https://devhelper-ai.onrender.com)
 
@@ -9,7 +9,7 @@ Analyze local projects, GitHub repos, or entire websites with **OpenAI** (online
 
 ## 🚀 Features
 
-- 🔍 **RAG** + Chunking + Vector Search
+- 🔍 **RAG** (Retrieval-Augmented Generation) + Chunking + Vector Search
 - 📂 Local folders or Docker-mounted volumes
 - 🌐 GitHub repo & Website content support
 - 🧠 Supports **OpenAI** (cloud, always) and **Ollama** (local, optional)
@@ -30,12 +30,12 @@ cp .env.example .env
 # Add your OpenAI API key to .env
 pip install -r requirements.txt
 streamlit run app.py
-Optionally:
-For Docker/Ollama (local RAG):
+Optionally, for Docker/Ollama (local RAG):
 
-
+# PowerShell
 .\run-devhelper.ps1
-# or, if on bash:
+
+# OR, if on bash:
 docker build -t devhelper-ai .
 docker run -it -p 8501:8501 -v "$(pwd):/mounted" --env-file .env devhelper-ai
 ☁️ Cloud/Render Deployment (OpenAI-only)
@@ -47,10 +47,12 @@ One-click deploy using render.yaml
 Set your Render environment variable:
 
 OPENAI_API_KEY=your-openai-key
-
-Note:
+⚠️ Note
 On Render (and any online cloud host), only OpenAI is supported.
+
 Ollama is only available for local Docker/dev use.
+
+The app will auto-select OpenAI on Render/cloud; no user/accidental Ollama usage.
 
 💡 Use Cases
 Chat with unfamiliar codebases
@@ -80,11 +82,11 @@ devhelper-ai/
 ├── render.yaml             # Render deploy spec
 └── README.md               # You’re reading it!
 👨‍💻 Author
-DevHelper AI by [Al Jubair Hossain]
+DevHelper AI by Al Jubair Hossain
 
-📎 GitHub: @XessX
+GitHub: @XessX
 
-📎 LinkedIn: al-jubair-hossain
+LinkedIn: al-jubair-hossain
 
 🙌 Acknowledgments
 LangChain
