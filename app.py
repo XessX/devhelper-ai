@@ -3,6 +3,9 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 import streamlit as st
+import hashlib
+import shutil
+
 from langchain_core.documents import Document
 
 from rag_engine.loader import load_codebase
@@ -17,10 +20,34 @@ load_dotenv()
 def is_docker():
     return os.path.exists("/.dockerenv") or os.getenv("DOCKERIZED", "false").lower() == "true"
 
+def is_render():
+    return os.getenv("RENDER", "false").lower() == "true" or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
+
+def extract_answer(response):
+    if isinstance(response, str):
+        return response
+    if hasattr(response, "content"):
+        return response.content
+    if isinstance(response, dict):
+        if "content" in response:
+            return response["content"]
+        if "answer" in response:
+            return response["answer"]
+    return str(response)
+
+def make_db_name(source, chunk_size, chunk_overlap):
+    hash_part = hashlib.md5(source.encode()).hexdigest()[:8]
+    return f"{hash_part}_c{chunk_size}_o{chunk_overlap}"
+
 docker_mode = is_docker()
+render_mode = is_render()
 
 if "history" not in st.session_state:
     st.session_state.history = []
+
+# Track the last cloned repo URL (for smart deletion)
+if "last_github_url" not in st.session_state:
+    st.session_state.last_github_url = None
 
 st.set_page_config(page_title="DevHelper AI 🤖", layout="wide")
 st.title("🧠 DevHelper AI - Chat with Your Codebase")
@@ -31,14 +58,12 @@ path_input, docs = "", []
 
 if source_option == "📁 Local Folder":
     use_mounted = st.checkbox("📦 Use mounted Docker volume (`/mounted`)", value=docker_mode)
-
     if use_mounted:
         base_mount = "/mounted"
         try:
             folders = [f for f in os.listdir(base_mount) if os.path.isdir(os.path.join(base_mount, f))]
         except Exception:
             folders = []
-
         st.markdown("📁 Choose subfolder inside `/mounted`")
         selected_folder = st.selectbox("Subdirectory:", options=[""] + folders)
         path_input = os.path.join(base_mount, selected_folder) if selected_folder else base_mount
@@ -48,9 +73,26 @@ if source_option == "📁 Local Folder":
 
 elif source_option == "🌐 GitHub Repo":
     github_url = st.text_input("🌐 Enter GitHub repo URL:")
+    force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_checkbox")
+    repo_changed = github_url != st.session_state.last_github_url
+
+    # If the repo URL changed, always clean `cloned_repo`
+    should_reclone = force_reindex or not os.path.exists("cloned_repo") or repo_changed
+
     if github_url:
-        with st.spinner("🔄 Cloning GitHub repo..."):
-            path_input = clone_github_repo(github_url, dest_folder="cloned_repo")
+        if should_reclone:
+            if os.path.exists("cloned_repo"):
+                shutil.rmtree("cloned_repo")
+            try:
+                with st.spinner("🔄 Cloning GitHub repo..."):
+                    path_input = clone_github_repo(github_url, dest_folder="cloned_repo")
+                st.session_state.last_github_url = github_url  # Remember the URL!
+                st.success("✅ Repo cloned successfully.")
+            except Exception as e:
+                st.error(str(e))
+                path_input = ""
+        else:
+            path_input = "cloned_repo"
 
 elif source_option == "🔗 Website":
     url = st.text_input("🔗 Enter website URL:")
@@ -62,7 +104,12 @@ elif source_option == "🔗 Website":
 
 # ───────────────────────────────────────────────
 exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__").split(",")
-llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0)
+
+if render_mode:
+    llm_engine = "OpenAI"
+    st.info("🌐 Running in online mode: Only OpenAI is available.")
+else:
+    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0)
 
 st.subheader("🔧 Chunking Configuration")
 smart_mode = st.checkbox("🧠 Auto-Tune Chunk Size", value=True)
@@ -77,34 +124,45 @@ else:
     chunk_overlap = st.slider("🔁 Chunk Overlap", 0, 500, chunk_overlap, 50)
 
 # ───────────────────────────────────────────────
+# ---- MAIN LOGIC: Unique DB path and force reindex ----
 if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
     try:
-        with st.spinner("⚙️ Processing project..."):
-            docs_dir = Path(path_input).name
-            db_name = f"{docs_dir}_c{chunk_size}_o{chunk_overlap}".replace("/", "_")
-            chroma_path = os.path.join("chroma_store", db_name)
+        if source_option == "🌐 GitHub Repo":
+            source_key = github_url.strip()
+        elif source_option == "🔗 Website":
+            source_key = url.strip()
+        else:
+            source_key = path_input.strip()
+        db_name = make_db_name(source_key, chunk_size, chunk_overlap)
+        chroma_path = os.path.join("chroma_store", db_name)
 
-            if os.path.exists(chroma_path):
+        # Only ask for force re-index for Local/Website after repo is set
+        if source_option != "🌐 GitHub Repo":
+            force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_other")
+
+        with st.spinner("⚙️ Processing project..."):
+            if os.path.exists(chroma_path) and not force_reindex:
                 vectordb = load_chroma(chroma_path)
                 st.success("✅ Loaded existing vector DB")
+                chunks = None
             else:
                 if not docs:
                     docs = load_codebase(path_input, exclude_dirs=exclude_dirs)
                 chunks = chunk_repo_texts(docs, chunk_size=chunk_size, overlap=chunk_overlap)
-
-                # Ensure all are Document type
                 chunks = [
                     doc if isinstance(doc, Document) else
                     Document(page_content=doc.get("page_content", ""), metadata=doc.get("metadata", {}))
                     for doc in chunks
                 ]
-
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            qa_chain = get_llm_chain(vectordb, engine=llm_engine.lower())
+            qa_chain = get_llm_chain(vectordb, engine=llm_engine.lower() if not render_mode else "openai")
 
         if st.checkbox("📜 Preview Chunked Content"):
+            if chunks is None and os.path.exists(chroma_path):
+                docs = load_codebase(path_input, exclude_dirs=exclude_dirs)
+                chunks = chunk_repo_texts(docs, chunk_size=chunk_size, overlap=chunk_overlap)
             preview_chunks(chunks)
 
         query = st.text_input("💬 Ask something about the codebase or page:")
@@ -112,11 +170,12 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
             with st.spinner("🔍 Thinking..."):
                 try:
                     response = qa_chain.invoke({"query": query})
+                    answer = extract_answer(response)
                 except Exception as e:
-                    response = f"❌ Error: {e}"
+                    answer = f"❌ Error: {e}"
                 st.markdown("**🧠 Answer:**")
-                st.write(response)
-                st.session_state.history.append({"q": query, "a": response})
+                st.write(answer)
+                st.session_state.history.append({"q": query, "a": answer})
 
         if st.session_state.history:
             hist_json = json.dumps(st.session_state.history, indent=2)

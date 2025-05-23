@@ -1,0 +1,9 @@
+using UnityEngine;
+using WolarGames.Variables;
+
+#NAMESPACE_KEYWORD# #NAMESPACE#
+#NAMESPACE_OPEN#
+    [CreateAssetMenu(menuName = "Variables/#VARIABLE#", order = 100)]
+    public class #VARIABLE#Variable : Variable<#VARIABLE#>
+    { }
+#NAMESPACE_CLOSE#

@@ -1,0 +1,9 @@
+using UnityEditor;
+using WolarGames.Variables;
+
+#NAMESPACE_KEYWORD# #NAMESPACE#
+#NAMESPACE_OPEN#
+    [CustomPropertyDrawer(typeof(#VARIABLE#Reference))]
+    public class #VARIABLE#ReferenceDrawer : ReferenceDrawer
+    { }
+#NAMESPACE_CLOSE#
