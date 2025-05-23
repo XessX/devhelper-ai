@@ -42,10 +42,15 @@ def make_db_name(source, chunk_size, chunk_overlap):
 docker_mode = is_docker()
 render_mode = is_render()
 
+# 🚨 Clean up ALL ollama/llm-related keys from session state in Render/cloud mode!
+if render_mode:
+    for k in list(st.session_state.keys()):
+        if "ollama" in k.lower() or "llm" in k.lower():
+            del st.session_state[k]
+
 if "history" not in st.session_state:
     st.session_state.history = []
 
-# Track the last cloned repo URL (for smart deletion)
 if "last_github_url" not in st.session_state:
     st.session_state.last_github_url = None
 
@@ -53,11 +58,11 @@ st.set_page_config(page_title="DevHelper AI 🤖", layout="wide")
 st.title("🧠 DevHelper AI - Chat with Your Codebase")
 
 # ───────────────────────────────────────────────
-source_option = st.radio("📦 Load project from:", ["📁 Local Folder", "🌐 GitHub Repo", "🔗 Website"])
+source_option = st.radio("📦 Load project from:", ["📁 Local Folder", "🌐 GitHub Repo", "🔗 Website"], key="source_option")
 path_input, docs = "", []
 
 if source_option == "📁 Local Folder":
-    use_mounted = st.checkbox("📦 Use mounted Docker volume (`/mounted`)", value=docker_mode)
+    use_mounted = st.checkbox("📦 Use mounted Docker volume (`/mounted`)", value=docker_mode, key="mounted_checkbox")
     if use_mounted:
         base_mount = "/mounted"
         try:
@@ -65,17 +70,16 @@ if source_option == "📁 Local Folder":
         except Exception:
             folders = []
         st.markdown("📁 Choose subfolder inside `/mounted`")
-        selected_folder = st.selectbox("Subdirectory:", options=[""] + folders)
+        selected_folder = st.selectbox("Subdirectory:", options=[""] + folders, key="folder_selectbox")
         path_input = os.path.join(base_mount, selected_folder) if selected_folder else base_mount
         st.success(f"📁 Using: `{path_input}`")
     else:
-        path_input = st.text_input("📁 Enter full path to your local folder:")
+        path_input = st.text_input("📁 Enter full path to your local folder:", key="local_path_input")
 
 elif source_option == "🌐 GitHub Repo":
-    github_url = st.text_input("🌐 Enter GitHub repo URL:")
+    github_url = st.text_input("🌐 Enter GitHub repo URL:", key="gh_url_input")
     force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_checkbox")
     repo_changed = github_url != st.session_state.last_github_url
-
     should_reclone = force_reindex or not os.path.exists("cloned_repo") or repo_changed
 
     if github_url:
@@ -94,25 +98,24 @@ elif source_option == "🌐 GitHub Repo":
             path_input = "cloned_repo"
 
 elif source_option == "🔗 Website":
-    url = st.text_input("🔗 Enter website URL:")
+    url = st.text_input("🔗 Enter website URL:", key="web_url_input")
     if url:
         with st.spinner("🌐 Scraping website..."):
             doc = load_webpage_as_document(url)
             docs = [doc]
             path_input = "web_loaded"
 
-# ───────────────────────────────────────────────
-exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__").split(",")
+exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__", key="exclude_dirs_textarea").split(",")
 
-# Only allow OpenAI in Render/cloud mode (ALWAYS LOWERCASE!)
+# Always force OpenAI in Render mode; local can choose
 if render_mode:
     llm_engine = "openai"
     st.info("🌐 Running in online mode: Only OpenAI is available.")
 else:
-    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0).lower()
+    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0, key="llm_radio").lower()
 
 st.subheader("🔧 Chunking Configuration")
-smart_mode = st.checkbox("🧠 Auto-Tune Chunk Size", value=True)
+smart_mode = st.checkbox("🧠 Auto-Tune Chunk Size", value=True, key="autotune_checkbox")
 chunk_size, chunk_overlap = 800, 100
 
 if smart_mode and path_input and os.path.isdir(path_input):
@@ -120,10 +123,9 @@ if smart_mode and path_input and os.path.isdir(path_input):
     st.success(f"✨ Auto-Tune: {suggested_size} chunks | {suggested_overlap} overlap")
     chunk_size, chunk_overlap = suggested_size, suggested_overlap
 else:
-    chunk_size = st.slider("🧩 Chunk Size", 100, 2000, chunk_size, 100)
-    chunk_overlap = st.slider("🔁 Chunk Overlap", 0, 500, chunk_overlap, 50)
+    chunk_size = st.slider("🧩 Chunk Size", 100, 2000, chunk_size, 100, key="chunk_slider")
+    chunk_overlap = st.slider("🔁 Chunk Overlap", 0, 500, chunk_overlap, 50, key="overlap_slider")
 
-# ---- MAIN LOGIC: Unique DB path and force reindex ----
 if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
     try:
         if source_option == "🌐 GitHub Repo":
@@ -158,19 +160,19 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            # ALWAYS force OpenAI for Render/online, never let Ollama be used (LLM engine is ALWAYS lowercase here)
+            # Always, always force openai for Render/cloud!
             qa_chain = get_llm_chain(
                 vectordb,
-                engine=llm_engine  # Always 'openai' on Render
+                engine="openai" if render_mode else llm_engine
             )
 
-        if st.checkbox("📜 Preview Chunked Content"):
+        if st.checkbox("📜 Preview Chunked Content", key="preview_checkbox"):
             if 'chunks' not in locals() or chunks is None:
                 docs = load_codebase(path_input, exclude_dirs=exclude_dirs)
                 chunks = chunk_repo_texts(docs, chunk_size=chunk_size, overlap=chunk_overlap)
             preview_chunks(chunks)
 
-        query = st.text_input("💬 Ask something about the codebase or page:")
+        query = st.text_input("💬 Ask something about the codebase or page:", key="query_input")
         if query:
             with st.spinner("🔍 Thinking..."):
                 try:
@@ -184,7 +186,7 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
 
         if st.session_state.history:
             hist_json = json.dumps(st.session_state.history, indent=2)
-            st.download_button("💾 Download Chat Log", hist_json, file_name="devhelper_chat.json")
+            st.download_button("💾 Download Chat Log", hist_json, file_name="devhelper_chat.json", key="dl_button")
 
     except Exception as e:
         st.error(f"❌ Error: {e}")
