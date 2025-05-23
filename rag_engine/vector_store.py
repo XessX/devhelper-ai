@@ -1,20 +1,22 @@
+import os
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-# Try importing Ollama, guard if not installed
-try:
-    from langchain_ollama import OllamaEmbeddings
-except ImportError:
-    OllamaEmbeddings = None
-
+# Optional imports, guarded for environments where not installed
 try:
     from langchain_openai import OpenAIEmbeddings
 except ImportError:
     OpenAIEmbeddings = None
 
-import os
+try:
+    from langchain_ollama import OllamaEmbeddings
+except ImportError:
+    OllamaEmbeddings = None
 
 def is_render():
+    """
+    Returns True if running on Render/cloud.
+    """
     return (
         os.getenv("RENDER", "false").lower() == "true"
         or "onrender.com" in os.environ.get("RENDER_EXTERNAL_HOSTNAME", "")
@@ -22,24 +24,27 @@ def is_render():
 
 def _get_embedding(engine: str = "openai"):
     """
-    Returns the correct embedding function for the environment.
-    Default: OpenAI on Render/cloud, Ollama if local and requested.
+    Returns the correct embedding instance.
+    - Always uses OpenAI on Render/cloud, regardless of user choice.
+    - Locally, uses OpenAI or Ollama as requested.
     """
     if is_render() or engine == "openai":
         if OpenAIEmbeddings is None:
-            raise ImportError("OpenAIEmbeddings not installed.")
-        return OpenAIEmbeddings()
+            raise ImportError("OpenAIEmbeddings is not installed. Please install langchain_openai.")
+        return OpenAIEmbeddings(openai_api_key=os.getenv("OPENAI_API_KEY"))
     elif engine == "ollama":
         if OllamaEmbeddings is None:
-            raise ImportError("OllamaEmbeddings not installed.")
+            raise ImportError("OllamaEmbeddings is not installed. Please install langchain_ollama.")
         return OllamaEmbeddings(model="llama3")
     else:
-        raise ValueError("Unknown embedding engine: choose 'openai' or 'ollama'")
+        raise ValueError("Unknown embedding engine: choose 'openai' or 'ollama'.")
 
 def store_in_chroma(chunks, persist_path="chroma_store", embedding_engine="openai"):
+    """
+    Stores document chunks in a Chroma vector DB using the correct embedding engine.
+    """
     embedding = _get_embedding(embedding_engine)
 
-    # Ensure all items are Document instances
     valid_docs = []
     for doc in chunks:
         if isinstance(doc, Document):
@@ -52,7 +57,6 @@ def store_in_chroma(chunks, persist_path="chroma_store", embedding_engine="opena
         else:
             raise ValueError("Chunk must be a Document or dict.")
 
-    # Build and persist vector store
     return Chroma.from_documents(
         documents=valid_docs,
         embedding=embedding,
@@ -60,6 +64,9 @@ def store_in_chroma(chunks, persist_path="chroma_store", embedding_engine="opena
     )
 
 def load_chroma(persist_path="chroma_store", embedding_engine="openai"):
+    """
+    Loads a Chroma vector DB using the correct embedding engine.
+    """
     embedding = _get_embedding(embedding_engine)
     return Chroma(
         embedding_function=embedding,

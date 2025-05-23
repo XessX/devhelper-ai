@@ -35,10 +35,16 @@ def load_llm(engine: str = None):
     # --- Import ONLY what you need ---
     if engine == "ollama":
         # Only import Ollama client locally, never in cloud
-        from langchain_ollama import OllamaLLM
+        try:
+            from langchain_ollama import OllamaLLM
+        except ImportError:
+            raise ImportError("langchain_ollama is not installed. Please install it to use Ollama locally.")
         return OllamaLLM(model="llama3")
     else:
-        from langchain_openai import ChatOpenAI
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise ImportError("langchain_openai is not installed. Please install it to use OpenAI.")
         return ChatOpenAI(
             model="gpt-4",
             temperature=0,

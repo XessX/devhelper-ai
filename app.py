@@ -119,6 +119,7 @@ exclude_dirs = st.text_area(
 if render_mode:
     llm_engine = "openai"
     st.info("🌐 Running in online mode: Only OpenAI is available.")
+    embedding_engine = "openai"
 else:
     llm_engine = st.radio(
         "🧠 Choose LLM Engine", 
@@ -126,6 +127,7 @@ else:
         index=0, 
         key="llm_radio"
     ).lower()
+    embedding_engine = llm_engine
 
 # --- Chunking Config ---
 st.subheader("🔧 Chunking Configuration")
@@ -159,8 +161,9 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
         with st.spinner("⚙️ Processing project..."):
             do_reindex = force_reindex if source_option == "🌐 GitHub Repo" else force_reindex_other
 
+            # Pass embedding_engine to store/load functions
             if os.path.exists(chroma_path) and not do_reindex:
-                vectordb = load_chroma(chroma_path)
+                vectordb = load_chroma(chroma_path, embedding_engine=embedding_engine)
                 st.success("✅ Loaded existing vector DB")
                 chunks = None
             else:
@@ -172,12 +175,10 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                     Document(page_content=doc.get("page_content", ""), metadata=doc.get("metadata", {}))
                     for doc in chunks
                 ]
-                vectordb = store_in_chroma(chunks, persist_path=chroma_path)
+                vectordb = store_in_chroma(chunks, persist_path=chroma_path, embedding_engine=embedding_engine)
                 st.success("✅ New vector store created")
 
-            # --- SAFETY: Always use OpenAI on Render/cloud ---
             engine_to_use = "openai" if render_mode else llm_engine
-
             qa_chain = get_llm_chain(
                 vectordb,
                 engine=engine_to_use
