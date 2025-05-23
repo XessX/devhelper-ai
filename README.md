@@ -1,6 +1,7 @@
 # 🧠 DevHelper AI
 
-Chat with your codebase. Analyze local projects, GitHub repos, or entire websites using OpenAI or Ollama.
+**Chat with your codebase using LLMs!**  
+Analyze local projects, GitHub repos, or entire websites with **OpenAI** (online) or **Ollama** (local, optional).
 
 🌐 **Live Demo:** [https://devhelper-ai.onrender.com](https://devhelper-ai.onrender.com)
 
@@ -8,64 +9,62 @@ Chat with your codebase. Analyze local projects, GitHub repos, or entire website
 
 ## 🚀 Features
 
-- 🔍 RAG + Chunking + Vector Search
-- 📂 Local folders or mounted Docker volumes
-- 🌐 GitHub & Website support
-- 🧠 Ollama (LLaMA3) and OpenAI support
-- 🧱 ChromaDB persistence
-- 💬 Streamlit-based UI
-- 📥 Export chat history
+- 🔍 **RAG** + Chunking + Vector Search
+- 📂 Local folders or Docker-mounted volumes
+- 🌐 GitHub repo & Website content support
+- 🧠 Supports **OpenAI** (cloud, always) and **Ollama** (local, optional)
+- 🧱 ChromaDB persistence (vector store)
+- 💬 Streamlit-based chat UI
+- 📥 Export chat history (JSON)
 
 ---
 
-## ⚙️ Local Setup
+## ⚙️ Quick Start
+
+### 🏗️ **Local/Dev Mode** (OpenAI or Ollama)
 
 ```bash
 git clone https://github.com/XessX/devhelper-ai
 cd devhelper-ai
 cp .env.example .env
-Add your OPENAI_API_KEY in .env.
-
-▶️ Run the App
-bash
-
+# Add your OpenAI API key to .env
 pip install -r requirements.txt
 streamlit run app.py
+Optionally:
+For Docker/Ollama (local RAG):
 
-🐳 Docker Mode (Recommended)
-powershell
+
 .\run-devhelper.ps1
-Your local project folder will be mounted to /mounted.
-
-☁️ Deploy to Render
-Push to GitHub: https://github.com/XessX/devhelper-ai
+# or, if on bash:
+docker build -t devhelper-ai .
+docker run -it -p 8501:8501 -v "$(pwd):/mounted" --env-file .env devhelper-ai
+☁️ Cloud/Render Deployment (OpenAI-only)
+Push to GitHub:
+https://github.com/XessX/devhelper-ai
 
 One-click deploy using render.yaml
 
-Set your Render env variable:
-env
-OPENAI_API_KEY=your-key-here
+Set your Render environment variable:
 
+OPENAI_API_KEY=your-openai-key
 
-## 📸 Screenshot
-
-![DevHelper AI Screenshot](assets/Screenshot-2025-04-18-080345.png)
+Note:
+On Render (and any online cloud host), only OpenAI is supported.
+Ollama is only available for local Docker/dev use.
 
 💡 Use Cases
-Chat with unfamiliar repositories
+Chat with unfamiliar codebases
 
-Understand legacy codebases
+Understand legacy repositories
 
-Explore GitHub projects interactively
+Explore or debug GitHub projects interactively
 
-Extract README or architecture details
+Extract architecture or README details
 
-Scrape and summarize documentation sites
+Scrape & summarize documentation sites
 
 📁 Project Structure
-bash
-Copy
-Edit
+
 devhelper-ai/
 ├── app.py                  # Streamlit frontend
 ├── rag_engine/             # Code loaders, chunkers, RAG logic
@@ -74,16 +73,18 @@ devhelper-ai/
 │   ├── query_engine.py
 │   ├── utils.py
 │   └── vector_store.py
-├── Dockerfile              # Docker container
-├── run-devhelper.ps1       # Powershell launcher
+├── Dockerfile              # Docker container (local, dev)
+├── run-devhelper.ps1       # PowerShell launcher for Docker
 ├── requirements.txt        # Python dependencies
-├── .env.example            # Environment variable sample
+├── .env.example            # Env variable template
 ├── render.yaml             # Render deploy spec
-└── README.md               # You're reading it!
-
-
+└── README.md               # You’re reading it!
 👨‍💻 Author
-DevHelper AI by [Al_Jubair_Hossain]
+DevHelper AI by [Al Jubair Hossain]
+
+📎 GitHub: @XessX
+
+📎 LinkedIn: al-jubair-hossain
 
 🙌 Acknowledgments
 LangChain
@@ -94,7 +95,16 @@ ChromaDB
 
 Streamlit
 
-📡 Connect
-📬 Al Jubair Hossain
-📎 GitHub: [@XessX](https://github.com/XessX)
-📎 LinkedIn: [al-jubair-hossain](https://linkedin.com/in/al-jubair-hossain-2ab89011b/)
+🛡️ LLM Engine Policy
+OpenAI: Always available, required for online/cloud (Render, etc.)
+
+Ollama: Only available in local Docker/dev environments.
+
+On Render/cloud, Ollama is disabled & cannot be selected.
+
+The app will auto-select OpenAI on Render; no user/accidental Ollama usage.
+
+📥 Export/Import
+Download chat logs as .json for research or reuse.
+
+Enjoy your AI-powered codebase assistant!

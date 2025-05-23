@@ -76,7 +76,7 @@ elif source_option == "🌐 GitHub Repo":
     force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_checkbox")
     repo_changed = github_url != st.session_state.last_github_url
 
-    # If the repo URL changed, always clean `cloned_repo`
+    # Always clean 'cloned_repo' if switching repos, missing folder, or force_reindex
     should_reclone = force_reindex or not os.path.exists("cloned_repo") or repo_changed
 
     if github_url:
@@ -86,7 +86,7 @@ elif source_option == "🌐 GitHub Repo":
             try:
                 with st.spinner("🔄 Cloning GitHub repo..."):
                     path_input = clone_github_repo(github_url, dest_folder="cloned_repo")
-                st.session_state.last_github_url = github_url  # Remember the URL!
+                st.session_state.last_github_url = github_url
                 st.success("✅ Repo cloned successfully.")
             except Exception as e:
                 st.error(str(e))
@@ -105,6 +105,7 @@ elif source_option == "🔗 Website":
 # ───────────────────────────────────────────────
 exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__").split(",")
 
+# Only allow OpenAI in online mode
 if render_mode:
     llm_engine = "OpenAI"
     st.info("🌐 Running in online mode: Only OpenAI is available.")
@@ -123,7 +124,6 @@ else:
     chunk_size = st.slider("🧩 Chunk Size", 100, 2000, chunk_size, 100)
     chunk_overlap = st.slider("🔁 Chunk Overlap", 0, 500, chunk_overlap, 50)
 
-# ───────────────────────────────────────────────
 # ---- MAIN LOGIC: Unique DB path and force reindex ----
 if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
     try:
@@ -137,11 +137,15 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
         chroma_path = os.path.join("chroma_store", db_name)
 
         # Only ask for force re-index for Local/Website after repo is set
+        force_reindex_other = False
         if source_option != "🌐 GitHub Repo":
-            force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_other")
+            force_reindex_other = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_other")
 
         with st.spinner("⚙️ Processing project..."):
-            if os.path.exists(chroma_path) and not force_reindex:
+            # Handle local/website vs. GitHub force_reindex variable
+            do_reindex = force_reindex if source_option == "🌐 GitHub Repo" else force_reindex_other
+
+            if os.path.exists(chroma_path) and not do_reindex:
                 vectordb = load_chroma(chroma_path)
                 st.success("✅ Loaded existing vector DB")
                 chunks = None
@@ -157,10 +161,14 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            qa_chain = get_llm_chain(vectordb, engine=llm_engine.lower() if not render_mode else "openai")
+            # ALWAYS force OpenAI for Render/online, never let Ollama be used
+            qa_chain = get_llm_chain(
+                vectordb,
+                engine=llm_engine.lower() if not render_mode else "openai"
+            )
 
         if st.checkbox("📜 Preview Chunked Content"):
-            if chunks is None and os.path.exists(chroma_path):
+            if 'chunks' not in locals() or chunks is None:
                 docs = load_codebase(path_input, exclude_dirs=exclude_dirs)
                 chunks = chunk_repo_texts(docs, chunk_size=chunk_size, overlap=chunk_overlap)
             preview_chunks(chunks)
