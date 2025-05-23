@@ -76,7 +76,6 @@ elif source_option == "🌐 GitHub Repo":
     force_reindex = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_checkbox")
     repo_changed = github_url != st.session_state.last_github_url
 
-    # Always clean 'cloned_repo' if switching repos, missing folder, or force_reindex
     should_reclone = force_reindex or not os.path.exists("cloned_repo") or repo_changed
 
     if github_url:
@@ -105,12 +104,12 @@ elif source_option == "🔗 Website":
 # ───────────────────────────────────────────────
 exclude_dirs = st.text_area("🚫 Folders to exclude (comma-separated)", ".venv, node_modules, __pycache__").split(",")
 
-# Only allow OpenAI in online mode
+# Only allow OpenAI in Render/cloud mode (ALWAYS LOWERCASE!)
 if render_mode:
-    llm_engine = "OpenAI"
+    llm_engine = "openai"
     st.info("🌐 Running in online mode: Only OpenAI is available.")
 else:
-    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0)
+    llm_engine = st.radio("🧠 Choose LLM Engine", ["OpenAI", "Ollama"], index=0).lower()
 
 st.subheader("🔧 Chunking Configuration")
 smart_mode = st.checkbox("🧠 Auto-Tune Chunk Size", value=True)
@@ -136,13 +135,11 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
         db_name = make_db_name(source_key, chunk_size, chunk_overlap)
         chroma_path = os.path.join("chroma_store", db_name)
 
-        # Only ask for force re-index for Local/Website after repo is set
         force_reindex_other = False
         if source_option != "🌐 GitHub Repo":
             force_reindex_other = st.checkbox("🔁 Force re-index this repo", value=False, key="force_reindex_other")
 
         with st.spinner("⚙️ Processing project..."):
-            # Handle local/website vs. GitHub force_reindex variable
             do_reindex = force_reindex if source_option == "🌐 GitHub Repo" else force_reindex_other
 
             if os.path.exists(chroma_path) and not do_reindex:
@@ -161,10 +158,10 @@ if path_input and (os.path.isdir(path_input) or path_input == "web_loaded"):
                 vectordb = store_in_chroma(chunks, persist_path=chroma_path)
                 st.success("✅ New vector store created")
 
-            # ALWAYS force OpenAI for Render/online, never let Ollama be used
+            # ALWAYS force OpenAI for Render/online, never let Ollama be used (LLM engine is ALWAYS lowercase here)
             qa_chain = get_llm_chain(
                 vectordb,
-                engine=llm_engine.lower() if not render_mode else "openai"
+                engine=llm_engine  # Always 'openai' on Render
             )
 
         if st.checkbox("📜 Preview Chunked Content"):
